@@ -69,12 +69,18 @@ def perform_conversion():
         status_label.config(text="Error: Please select both input DOCX and output .tex files.")
         return
 
-    # Determine media extraction path
+    # Determine media extraction path for Overleaf compatibility
+    # Images will be extracted to a 'media' subdirectory within the output .tex file's directory.
     output_dir = os.path.dirname(output_tex_path)
-    base_name_no_ext = os.path.splitext(os.path.basename(output_tex_path))[0]
-    # Ensure media path is unique and uses directory of output .tex file
-    media_extract_path = os.path.join(output_dir, f"{base_name_no_ext}_media")
+    if not output_dir: # If output_tex_path is just a filename, implies current directory
+        media_extract_path = "."
+    else:
+        media_extract_path = output_dir
 
+    # Pandoc will create a 'media' subfolder within this path.
+    # So, if output_tex_path = "/path/to/doc.tex", media_extract_path = "/path/to",
+    # and Pandoc creates "/path/to/media/image.png".
+    # The \includegraphics command in LaTeX should then be {media/image.png}.
 
     status_label.config(text="Converting...")
     root.update_idletasks() # Ensure UI updates before blocking conversion call
@@ -123,7 +129,12 @@ clear_template_button.pack(pady=(0,5))
 # --- ToC Checkbox ---
 toc_var = tk.BooleanVar()
 toc_checkbox = tk.Checkbutton(root, text="Generate Table of Contents", variable=toc_var)
-toc_checkbox.pack(pady=(5,5))
+toc_checkbox.pack(pady=(5,0))
+
+# --- Custom Style Filter Checkbox ---
+apply_style_filter_var = tk.BooleanVar()
+style_filter_checkbox = tk.Checkbutton(root, text="Preserve 'DocxToLatexCentered' style (if used in Word)", variable=apply_style_filter_var)
+style_filter_checkbox.pack(pady=(0,5))
 
 # --- Convert Button ---
 convert_button = tk.Button(root, text="Convert", command=perform_conversion)
