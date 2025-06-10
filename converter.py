@@ -55,30 +55,62 @@ def convert_docx_to_latex(
         extra_args.extend([
             "--from=docx+styles",
             "--wrap=preserve",
-            "--columns=72"
+            "--columns=72",
+            "--strip-comments"  # Remove comments that might cause highlighting
         ])
     
     if preserve_linebreaks:
-        extra_args.append("--preserve-tabs")
+        extra_args.extend([
+            "--preserve-tabs",
+            "--wrap=preserve",
+            "--reference-doc=" + docx_path  # Use original Word doc as reference for formatting
+        ])
         
-        # Create inline Lua filter for line break preservation
+        # Create minimal Lua filter that preserves Word's original line breaks
         lua_filter_content = '''
 function Para(elem)
-  -- Convert soft breaks to hard breaks in paragraphs
+  -- Preserve all line breaks exactly as they appear in Word
+  -- This maintains Word's original pagination and formatting
   local new_content = {}
+  
   for i, item in ipairs(elem.content) do
-    table.insert(new_content, item)
     if item.t == "SoftBreak" then
-      -- Replace SoftBreak with LineBreak
-      new_content[#new_content] = pandoc.LineBreak()
+      -- Convert all soft breaks to line breaks to match Word's formatting
+      table.insert(new_content, pandoc.LineBreak())
+    else
+      table.insert(new_content, item)
     end
   end
+  
   elem.content = new_content
   return elem
 end
 
 function LineBlock(elem)
-  -- Preserve line blocks as they are
+  -- Preserve line blocks exactly as they are
+  return elem
+end
+
+function Span(elem)
+  -- Remove unwanted highlighting and formatting
+  if elem.attributes and elem.attributes.style then
+    -- Remove background colors and highlighting
+    local style = elem.attributes.style
+    if string.find(style, "background") or string.find(style, "highlight") then
+      elem.attributes.style = nil
+    end
+  end
+  return elem
+end
+
+function Div(elem)
+  -- Remove unwanted div formatting that causes highlighting
+  if elem.attributes and elem.attributes.style then
+    local style = elem.attributes.style
+    if string.find(style, "background") or string.find(style, "highlight") then
+      elem.attributes.style = nil
+    end
+  end
   return elem
 end
 
@@ -168,6 +200,9 @@ def _apply_post_processing(latex_path: str, overleaf_compatible: bool, preserve_
         # Apply line break preservation fixes
         if preserve_linebreaks:
             content = _fix_line_breaks_and_spacing(content)
+        
+        # Remove unwanted formatting and highlighting
+        content = _remove_unwanted_formatting(content)
         
         # Fix common LaTeX compilation issues
         content = _fix_compilation_issues(content)
@@ -276,6 +311,35 @@ def _fix_image_paths_for_overleaf(content: str, extract_media_to_path: str = Non
     
     return content
 
+def _remove_unwanted_formatting(content: str) -> str:
+    """
+    Remove unwanted highlighting and formatting that causes visual issues.
+    """
+    # Remove highlighting commands
+    content = re.sub(r'\\colorbox\{[^}]*\}\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\hl\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\texthl\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\hlc\[[^\]]*\]\{([^}]*)\}', r'\1', content)
+    
+    # Remove table cell coloring
+    content = re.sub(r'\\cellcolor\{[^}]*\}', '', content)
+    content = re.sub(r'\\rowcolor\{[^}]*\}', '', content)
+    content = re.sub(r'\\columncolor\{[^}]*\}', '', content)
+    
+    # Remove text background colors
+    content = re.sub(r'\\textcolor\{[^}]*\}\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\color\{[^}]*\}', '', content)
+    
+    # Remove box formatting that might cause highlighting
+    content = re.sub(r'\\fcolorbox\{[^}]*\}\{[^}]*\}\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\framebox\[[^\]]*\]\{([^}]*)\}', r'\1', content)
+    
+    # Remove soul package highlighting
+    content = re.sub(r'\\sethlcolor\{[^}]*\}', '', content)
+    content = re.sub(r'\\ul\{([^}]*)\}', r'\1', content)  # Remove underline if causing issues
+    
+    return content
+
 def _inject_latex_packages(content: str) -> str:
     """
     Inject additional LaTeX packages needed for enhanced formatting.
@@ -302,6 +366,7 @@ def _inject_latex_packages(content: str) -> str:
         r'\usepackage{ragged2e}',      # Better text alignment
         r'\usepackage{amsmath}',       # Mathematical formatting
         r'\usepackage{amssymb}',       # Mathematical symbols
+        r'\usepackage{needspace}',     # Prevent orphaned lines and improve page breaks
     ]
     
     all_packages = essential_packages + style_packages
@@ -357,24 +422,35 @@ def _add_centering_commands(content: str) -> str:
 
 def _fix_line_breaks_and_spacing(content: str) -> str:
     """
-    Fix line break and spacing issues for better formatting.
+    Minimal fixes to preserve Word's original formatting and pagination.
     """
-    # Fix spacing around numbered lists (enumerate)
-    content = re.sub(r'\n\\begin\{enumerate\}\n\n', r'\n\\begin{enumerate}\n', content)
-    content = re.sub(r'\n\n\\end\{enumerate\}\n', r'\n\\end{enumerate}\n\n', content)
+    # Remove unwanted highlighting and color commands
+    content = re.sub(r'\\colorbox\{[^}]*\}\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\hl\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\texthl\{([^}]*)\}', r'\1', content)
+    content = re.sub(r'\\cellcolor\{[^}]*\}', '', content)
+    content = re.sub(r'\\rowcolor\{[^}]*\}', '', content)
     
-    # Fix spacing around bullet lists (itemize)
-    content = re.sub(r'\n\\begin\{itemize\}\n\n', r'\n\\begin{itemize}\n', content)
+    # Only fix critical spacing issues that break compilation
+    # Preserve Word's original line breaks and spacing as much as possible
+    
+    # Ensure proper spacing around lists but don't change internal spacing
+    content = re.sub(r'\n\\begin\{enumerate\}\n\n', r'\n\n\\begin{enumerate}\n', content)
+    content = re.sub(r'\n\n\\end\{enumerate\}\n', r'\n\\end{enumerate}\n\n', content)
+    content = re.sub(r'\n\\begin\{itemize\}\n\n', r'\n\n\\begin{itemize}\n', content)
     content = re.sub(r'\n\n\\end\{itemize\}\n', r'\n\\end{itemize}\n\n', content)
     
-    # Fix excessive spacing between list items
-    content = re.sub(r'\\item\s*\n\n+', r'\\item ', content)
+    # Minimal section spacing - preserve Word's pagination
+    content = re.sub(r'\n(\\(?:sub)*section\{[^}]+\})\n\n', r'\n\n\1\n\n', content)
     
-    # Fix spacing around section headings
-    content = re.sub(r'\n\n(\\(?:sub)*section\{[^}]+\})\n\n', r'\n\n\1\n', content)
-    
-    # Fix paragraph spacing issues
+    # Only remove excessive spacing (3+ line breaks) but preserve double breaks
     content = re.sub(r'\n\n\n+', r'\n\n', content)
+    
+    # Ensure proper spacing around figures and tables
+    content = re.sub(r'\n\\begin\{figure\}', r'\n\n\\begin{figure}', content)
+    content = re.sub(r'\\end\{figure\}\n([A-Z])', r'\\end{figure}\n\n\1', content)
+    content = re.sub(r'\n\\begin\{table\}', r'\n\n\\begin{table}', content)
+    content = re.sub(r'\\end\{table\}\n([A-Z])', r'\\end{table}\n\n\1', content)
     
     return content
 

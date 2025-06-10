@@ -76,7 +76,8 @@ def show_help():
 📝 Preserve Line Breaks:
 • Fixes numbered list display issues
 • Maintains proper paragraph spacing
-• Prevents pagination problems
+• Prevents pagination problems (text compression)
+• Ensures correct page numbering and layout
 • Essential for documents with lists and structured content
 
 💡 Tip: All options are enabled by default for best results!"""
