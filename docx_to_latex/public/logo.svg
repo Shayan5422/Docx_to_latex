@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#4f46e5" stroke="#3730a3" stroke-width="2"/>
+  
+  <!-- Document icon -->
+  <rect x="18" y="12" width="20" height="26" rx="2" fill="white" opacity="0.9"/>
+  <rect x="20" y="16" width="16" height="2" fill="#4f46e5" opacity="0.6"/>
+  <rect x="20" y="20" width="12" height="2" fill="#4f46e5" opacity="0.6"/>
+  <rect x="20" y="24" width="14" height="2" fill="#4f46e5" opacity="0.6"/>
+  
+  <!-- Arrow pointing to -->
+  <path d="M40 25 L46 25 M44 23 L46 25 L44 27" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- LaTeX symbol -->
+  <text x="48" y="30" font-family="serif" font-size="10" font-weight="bold" fill="white">TeX</text>
+  
+  <!-- Math symbols -->
+  <circle cx="22" cy="45" r="2" fill="#f59e0b"/>
+  <rect x="26" y="43" width="4" height="4" fill="#10b981"/>
+  <polygon points="32,43 36,43 34,47" fill="#ef4444"/>
+</svg> 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader, Globe, Monitor } from 'lucide-react';
+import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader, Globe, Monitor, Github, Linkedin, Coffee } from 'lucide-react';
 
 interface ConversionOptions {
   generateToc: boolean;
@@ -191,37 +191,9 @@ export default function Home() {
           <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
             DOCX to LaTeX Converter
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-6">
-            Transform your Word documents into beautiful LaTeX files with enhanced formatting and Overleaf compatibility
-          </p>
-          
-          {/* API Source Selector */}
-          <div className="flex items-center justify-center gap-4">
-            <span className="text-sm text-gray-600 dark:text-gray-400">API Source:</span>
-            <button
-              onClick={toggleApiSource}
-              className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                usingLocalApi
-                  ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300 border border-orange-300'
-                  : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300 border border-green-300'
-              } hover:scale-105 transform`}
-            >
-              {usingLocalApi ? (
-                <>
-                  <Monitor className="w-4 h-4 mr-2" />
-                  Local API
-                </>
-              ) : (
-                <>
-                  <Globe className="w-4 h-4 mr-2" />
-                  Hugging Face Spaces
-                </>
-              )}
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Click to switch
-            </span>
-          </div>
+                     <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+             Transform your Word documents into beautiful LaTeX files with enhanced formatting and Overleaf compatibility
+           </p>
         </div>
 
         <div className="max-w-4xl mx-auto">
@@ -570,6 +542,38 @@ export default function Home() {
               {usingLocalApi ? 'Local API' : 'Hugging Face Spaces API'}
             </span>
           </div>
+          
+          {/* Social Media Links */}
+          <div className="flex items-center justify-center space-x-6 mb-4">
+            <a
+              href="https://www.linkedin.com/in/shayan-hashemi-5308081b1/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors duration-200 transform hover:scale-110"
+              aria-label="LinkedIn Profile"
+            >
+              <Linkedin className="w-6 h-6" />
+            </a>
+            <a
+              href="https://github.com/Shayan5422"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors duration-200 transform hover:scale-110"
+              aria-label="GitHub Profile"
+            >
+              <Github className="w-6 h-6" />
+            </a>
+            <a
+              href="https://buymeacoffee.com/shayanhshm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-500 hover:text-yellow-600 dark:text-gray-400 dark:hover:text-yellow-400 transition-colors duration-200 transform hover:scale-110"
+              aria-label="Buy me a coffee"
+            >
+              <Coffee className="w-6 h-6" />
+            </a>
+          </div>
+          
           <p className="text-gray-500 dark:text-gray-400">
             Enhanced DOCX to LaTeX Converter v2.0 | Built with Next.js &amp; Tailwind CSS
           </p>
