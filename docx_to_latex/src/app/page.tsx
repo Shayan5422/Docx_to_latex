@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader, Globe, Monitor, Github, Linkedin, Coffee } from 'lucide-react';
+import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader, Github, Linkedin, Coffee } from 'lucide-react';
 
 interface ConversionOptions {
   generateToc: boolean;
@@ -21,7 +21,6 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [usingLocalApi, setUsingLocalApi] = useState(false);
-  const [manualApiSwitch, setManualApiSwitch] = useState(false);
 
   const [options, setOptions] = useState<ConversionOptions>({
     generateToc: false,
@@ -54,18 +53,7 @@ export default function Home() {
   };
 
   const getApiBaseUrl = () => {
-    if (manualApiSwitch) {
-      return usingLocalApi ? 'http://localhost:5000' : 'https://shayan5422-docx-to-latex.hf.space';
-    }
     return usingLocalApi ? 'http://localhost:5000' : 'https://shayan5422-docx-to-latex.hf.space';
-  };
-
-  const toggleApiSource = () => {
-    setUsingLocalApi(!usingLocalApi);
-    setManualApiSwitch(true);
-    setApiError(null);
-    setConversionComplete(false);
-    setTaskId(null);
   };
 
   const handleConvert = async () => {
@@ -90,8 +78,8 @@ export default function Home() {
           const errorText = await uploadResponse.text();
           console.error('Upload failed:', uploadResponse.status, errorText);
           
-          // If Hugging Face fails and we haven't manually switched or tried local yet
-          if (!usingLocalApi && !manualApiSwitch && uploadResponse.status >= 500) {
+          // If Hugging Face fails and we haven't tried local yet
+          if (!usingLocalApi && uploadResponse.status >= 500) {
             setUsingLocalApi(true);
             setApiError(`Hugging Face API error (${uploadResponse.status}). Switching to local API...`);
             
