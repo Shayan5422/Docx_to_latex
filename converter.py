@@ -577,12 +577,23 @@ def _fix_image_paths_for_overleaf(content: str, extract_media_to_path: str = Non
     if extract_media_to_path:
         # Extract the media directory name
         media_dir = os.path.basename(extract_media_to_path.rstrip('/'))
-        # Replace absolute paths with relative paths
-        # Pattern: \includegraphics{/absolute/path/to/media/image.ext}
+        
+        # Fix paths with task IDs like: task_id_media/media/image.png -> media/image.png
+        # Pattern: \includegraphics{any_path/task_id_media/media/image.ext}
         # Replace with: \includegraphics{media/image.ext}
-        pattern = r'\\includegraphics(\[[^\]]*\])?\{[^{}]*[/\\]' + re.escape(media_dir) + r'[/\\]([^{}]+)\}'
-        replacement = r'\\includegraphics\1{' + media_dir + r'/\2}'
-        content = re.sub(pattern, replacement, content)
+        pattern1 = r'\\includegraphics(\[[^\]]*\])?\{[^{}]*[a-f0-9\-]+_media[/\\]media[/\\]([^{}]+)\}'
+        replacement1 = r'\\includegraphics\1{media/\2}'
+        content = re.sub(pattern1, replacement1, content)
+        
+        # Fix paths like: task_id_media/media/image.png -> media/image.png (without includegraphics)
+        pattern2 = r'[a-f0-9\-]+_media[/\\]media[/\\]'
+        replacement2 = r'media/'
+        content = re.sub(pattern2, replacement2, content)
+        
+        # Also handle regular media paths: /absolute/path/to/media/image.ext -> media/image.ext
+        pattern3 = r'\\includegraphics(\[[^\]]*\])?\{[^{}]*[/\\]' + re.escape(media_dir) + r'[/\\]([^{}]+)\}'
+        replacement3 = r'\\includegraphics\1{' + media_dir + r'/\2}'
+        content = re.sub(pattern3, replacement3, content)
     
     return content
 

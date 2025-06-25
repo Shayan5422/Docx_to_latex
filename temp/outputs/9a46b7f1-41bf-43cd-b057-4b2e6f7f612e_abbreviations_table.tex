@@ -1,0 +1,127 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+% Essential packages for compilation
+
+% Enhanced conversion packages
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+\usepackage{float}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{ragged2e}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{needspace}
+
+\usepackage{graphicx}
+
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\author{}
+\date{}
+
+% Unicode character definitions for LaTeX compatibility
+\DeclareUnicodeCharacter{2003}{ }  % Em space
+\DeclareUnicodeCharacter{2002}{ }  % En space
+\DeclareUnicodeCharacter{2009}{ }  % Thin space
+\DeclareUnicodeCharacter{200A}{ }  % Hair space
+\DeclareUnicodeCharacter{2004}{ }  % Three-per-em space
+\DeclareUnicodeCharacter{2005}{ }  % Four-per-em space
+\DeclareUnicodeCharacter{2006}{ }  % Six-per-em space
+\DeclareUnicodeCharacter{2008}{ }  % Punctuation space
+\DeclareUnicodeCharacter{202F}{ }  % Narrow no-break space
+\DeclareUnicodeCharacter{2212}{-}  % Unicode minus sign
+\DeclareUnicodeCharacter{2010}{-}  % Hyphen
+\DeclareUnicodeCharacter{2011}{-}  % Non-breaking hyphen
+\DeclareUnicodeCharacter{2013}{--} % En dash
+\DeclareUnicodeCharacter{2014}{---}% Em dash
+
+\begin{document}
+
+\hypertarget{tableau-des-abruxe9viations-acronymes}{%
+\section{Tableau des Abréviations / Acronymes}\label{tableau-des-abruxe9viations-acronymes}}
+
+\begin{longtable}[]{@{}ll@{}}
+\toprule
+Abréviation / Acronyme & Signification \\
+\midrule
+\endhead
+API & Application Programming Interface \\
+CK+ & Cohn-Kanade Extended (Base de données d'expressions faciales) \\
+CNN & Convolutional Neural Network (Réseau de Neurones Convolutif) \\
+EMG & Électromyographie \\
+FACS & Facial Action Coding System \\
+FER & Facial Expression Recognition (Reconnaissance d'Expressions Faciales) \\
+FPS & Frames Per Second (Images par Seconde) \\
+GPU & Graphics Processing Unit (Processeur Graphique) \\
+HCI & Human-Computer Interaction (Interaction Homme-Machine) \\
+IA & Intelligence Artificielle \\
+LSTM & Long Short-Term Memory (Mémoire Longue à Court Terme) \\
+.npy & NumPy Binary File Format (format de fichier binaire pour tableaux) \\
+.pkl & Pickle File (fichier sérialisé en Python) \\
+ROI & Region of Interest (Région d'Intérêt) \\
+\bottomrule
+\end{longtable}
+
+\end{document}
