@@ -1,0 +1,39 @@
+
+# راهنمای Deploy کردن روی Hugging Face Spaces
+
+## مرحله ۱: ایجاد Space
+1. به https://huggingface.co/spaces بروید
+2. "Create new Space" را کلیک کنید
+3. نام Space را وارد کنید: docx-to-latex
+4. SDK: Python انتخاب کنید
+5. "Create Space" را کلیک کنید
+
+## مرحله ۲: آپلود فایل‌ها
+تمام فایل‌های این پوشه را به Space آپلود کنید:
+
+### روش ۱: Git
+```bash
+git clone https://huggingface.co/spaces/YOUR_USERNAME/docx-to-latex
+cd docx-to-latex
+cp -r ../huggingface_deployment/* .
+git add .
+git commit -m "Add DOCX to LaTeX converter API"
+git push
+```
+
+### روش ۲: Web Interface
+فایل‌ها را drag & drop کنید در صفحه Space
+
+## مرحله ۳: تست
+پس از deploy، API در آدرس زیر دردسترس خواهد بود:
+https://YOUR_USERNAME-docx-to-latex.hf.space/api/health
+
+## فایل‌های کپی شده:
+- app.py
+- web_api.py
+- converter.py
+- requirements.txt
+- README.md
+- Dockerfile
+- .gitignore
+- preserve_linebreaks.lua

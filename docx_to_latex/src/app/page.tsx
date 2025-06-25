@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, FileText, Download, Settings, HelpCircle, Sparkles, Zap, Check, X, Loader } from 'lucide-react';
+import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader } from 'lucide-react';
 
 interface ConversionOptions {
   generateToc: boolean;
@@ -94,8 +94,6 @@ export default function Home() {
       if (!convertResponse.ok) {
         throw new Error('Conversion failed');
       }
-      
-      const convertData = await convertResponse.json();
       
       // Store task ID for download
       setTaskId(taskId);
@@ -432,7 +430,7 @@ export default function Home() {
                       📑 Table of Contents
                     </h4>
                     <p className="text-sm">
-                      Automatically generates a table of contents based on your document's headings and structure.
+                      Automatically generates a table of contents based on your document&apos;s headings and structure.
                     </p>
                   </div>
                 </div>
@@ -444,7 +442,7 @@ export default function Home() {
         {/* Footer */}
         <div className="text-center mt-12">
           <p className="text-gray-500 dark:text-gray-400">
-            Enhanced DOCX to LaTeX Converter v2.0 | Built with Next.js & Tailwind CSS
+            Enhanced DOCX to LaTeX Converter v2.0 | Built with Next.js &amp; Tailwind CSS
           </p>
         </div>
       </div>
