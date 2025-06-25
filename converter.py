@@ -140,9 +140,8 @@ end
             except OSError:
                 pass
         
-        # Apply post-processing enhancements
-        if overleaf_compatible or preserve_styles or preserve_linebreaks:
-            _apply_post_processing(latex_path, overleaf_compatible, preserve_styles, preserve_linebreaks, extract_media_to_path)
+        # Apply post-processing enhancements (always applied for Unicode conversion)
+        _apply_post_processing(latex_path, overleaf_compatible, preserve_styles, preserve_linebreaks, extract_media_to_path)
         
         # Generate status message
         enhancements = []
@@ -188,6 +187,15 @@ def _apply_post_processing(latex_path: str, overleaf_compatible: bool, preserve_
         # Always inject essential packages for compilation compatibility
         content = _inject_essential_packages(content)
         
+        # Fix mixed mathematical expressions first to remove duplicated text
+        content = _fix_mixed_mathematical_expressions(content)
+        
+        # Convert Unicode mathematical characters to LaTeX equivalents (always applied)
+        content = _convert_unicode_math_characters(content)
+        
+        # Apply additional Unicode cleanup as a safety net
+        content = _additional_unicode_cleanup(content)
+        
         # Apply overleaf compatibility fixes
         if overleaf_compatible:
             content = _fix_image_paths_for_overleaf(content, extract_media_to_path)
@@ -227,6 +235,9 @@ def _inject_essential_packages(content: str) -> str:
         r'\usepackage{longtable}',       # For tables
         r'\usepackage{booktabs}',        # Better table formatting
         r'\usepackage{hyperref}',        # For links (if not already included)
+        r'\usepackage{amsmath}',         # Mathematical formatting
+        r'\usepackage{amssymb}',         # Mathematical symbols
+        r'\usepackage{textcomp}',        # Additional text symbols
     ]
     
     documentclass_pattern = r'\\documentclass(?:\[[^\]]*\])?\{[^}]+\}'
@@ -244,8 +255,272 @@ def _inject_essential_packages(content: str) -> str:
         if packages_to_insert:
             package_block = '\n% Essential packages for compilation\n' + '\n'.join(packages_to_insert) + '\n'
             content = content[:insert_pos] + package_block + content[insert_pos:]
+        
+        # Add Unicode character definitions to handle any remaining problematic characters
+        unicode_definitions = r'''
+% Unicode character definitions for LaTeX compatibility
+\DeclareUnicodeCharacter{2003}{ }  % Em space
+\DeclareUnicodeCharacter{2002}{ }  % En space
+\DeclareUnicodeCharacter{2009}{ }  % Thin space
+\DeclareUnicodeCharacter{200A}{ }  % Hair space
+\DeclareUnicodeCharacter{2004}{ }  % Three-per-em space
+\DeclareUnicodeCharacter{2005}{ }  % Four-per-em space
+\DeclareUnicodeCharacter{2006}{ }  % Six-per-em space
+\DeclareUnicodeCharacter{2008}{ }  % Punctuation space
+\DeclareUnicodeCharacter{202F}{ }  % Narrow no-break space
+\DeclareUnicodeCharacter{2212}{-}  % Unicode minus sign
+\DeclareUnicodeCharacter{2010}{-}  % Hyphen
+\DeclareUnicodeCharacter{2011}{-}  % Non-breaking hyphen
+\DeclareUnicodeCharacter{2013}{--} % En dash
+\DeclareUnicodeCharacter{2014}{---}% Em dash
+'''
+        
+        # Insert Unicode definitions after packages but before \begin{document}
+        begin_doc_match = re.search(r'\\begin\{document\}', content)
+        if begin_doc_match:
+            insert_pos_unicode = begin_doc_match.start()
+            content = content[:insert_pos_unicode] + unicode_definitions + '\n' + content[insert_pos_unicode:]
     
     return content
+
+def _convert_unicode_math_characters(content: str) -> str:
+    """
+    Convert Unicode mathematical characters to their LaTeX equivalents.
+    """
+    # Dictionary of Unicode characters to LaTeX commands
+    unicode_to_latex = {
+        # Mathematical operators
+        'Δ': r'$\Delta$',           # U+0394 - Greek capital letter delta
+        'δ': r'$\delta$',           # U+03B4 - Greek small letter delta
+        '∑': r'$\sum$',             # U+2211 - N-ary summation
+        '∏': r'$\prod$',            # U+220F - N-ary product
+        '∫': r'$\int$',             # U+222B - Integral
+        '∂': r'$\partial$',         # U+2202 - Partial differential
+        '∇': r'$\nabla$',           # U+2207 - Nabla
+        '√': r'$\sqrt{}$',          # U+221A - Square root
+        '∞': r'$\infty$',           # U+221E - Infinity
+        
+        # Relations and equality
+        '≈': r'$\approx$',          # U+2248 - Almost equal to
+        '≠': r'$\neq$',             # U+2260 - Not equal to
+        '≤': r'$\leq$',             # U+2264 - Less-than or equal to
+        '≥': r'$\geq$',             # U+2265 - Greater-than or equal to
+        '±': r'$\pm$',              # U+00B1 - Plus-minus sign
+        '∓': r'$\mp$',              # U+2213 - Minus-or-plus sign
+        '×': r'$\times$',           # U+00D7 - Multiplication sign
+        '÷': r'$\div$',             # U+00F7 - Division sign
+        '⋅': r'$\cdot$',            # U+22C5 - Dot operator
+        
+        # Set theory and logic
+        '∈': r'$\in$',              # U+2208 - Element of
+        '∉': r'$\notin$',           # U+2209 - Not an element of
+        '⊂': r'$\subset$',          # U+2282 - Subset of
+        '⊃': r'$\supset$',          # U+2283 - Superset of
+        '⊆': r'$\subseteq$',        # U+2286 - Subset of or equal to
+        '⊇': r'$\supseteq$',        # U+2287 - Superset of or equal to
+        '∪': r'$\cup$',             # U+222A - Union
+        '∩': r'$\cap$',             # U+2229 - Intersection
+        '∅': r'$\emptyset$',        # U+2205 - Empty set
+        '∀': r'$\forall$',          # U+2200 - For all
+        '∃': r'$\exists$',          # U+2203 - There exists
+        
+        # Special symbols
+        '∣': r'$|$',                # U+2223 - Divides
+        '∥': r'$\parallel$',        # U+2225 - Parallel to
+        '⊥': r'$\perp$',            # U+22A5 - Up tack (perpendicular)
+        '∠': r'$\angle$',           # U+2220 - Angle
+        '°': r'$^\circ$',           # U+00B0 - Degree sign
+        
+        # Arrows
+        '→': r'$\rightarrow$',      # U+2192 - Rightwards arrow
+        '←': r'$\leftarrow$',       # U+2190 - Leftwards arrow
+        '↔': r'$\leftrightarrow$',  # U+2194 - Left right arrow
+        '⇒': r'$\Rightarrow$',      # U+21D2 - Rightwards double arrow
+        '⇐': r'$\Leftarrow$',       # U+21D0 - Leftwards double arrow
+        '⇔': r'$\Leftrightarrow$',  # U+21D4 - Left right double arrow
+        
+        # Accents and diacritics
+        'ˉ': r'$\bar{}$',           # U+02C9 - Modifier letter macron
+        'ˆ': r'$\hat{}$',           # U+02C6 - Modifier letter circumflex accent
+        'ˇ': r'$\check{}$',         # U+02C7 - Caron
+        '˜': r'$\tilde{}$',         # U+02DC - Small tilde
+        '˙': r'$\dot{}$',           # U+02D9 - Dot above
+        '¨': r'$\ddot{}$',          # U+00A8 - Diaeresis
+        
+        # Special minus and spaces - using explicit Unicode escape sequences
+        '−': r'-',                  # U+2212 - Minus sign (convert to regular hyphen)
+        '\u2003': r' ',             # U+2003 - Em space (convert to regular space)
+        '\u2009': r' ',             # U+2009 - Thin space (convert to regular space)
+        '\u2002': r' ',             # U+2002 - En space (convert to regular space)
+        '\u2004': r' ',             # U+2004 - Three-per-em space
+        '\u2005': r' ',             # U+2005 - Four-per-em space
+        '\u2006': r' ',             # U+2006 - Six-per-em space
+        '\u2008': r' ',             # U+2008 - Punctuation space
+        '\u200A': r' ',             # U+200A - Hair space
+        '\u202F': r' ',             # U+202F - Narrow no-break space
+        
+        # Greek letters (commonly used in math)
+        'α': r'$\alpha$',           # U+03B1
+        'β': r'$\beta$',            # U+03B2
+        'γ': r'$\gamma$',           # U+03B3
+        'Γ': r'$\Gamma$',           # U+0393
+        'ε': r'$\varepsilon$',      # U+03B5
+        'ζ': r'$\zeta$',            # U+03B6
+        'η': r'$\eta$',             # U+03B7
+        'θ': r'$\theta$',           # U+03B8
+        'Θ': r'$\Theta$',           # U+0398
+        'ι': r'$\iota$',            # U+03B9
+        'κ': r'$\kappa$',           # U+03BA
+        'λ': r'$\lambda$',          # U+03BB
+        'Λ': r'$\Lambda$',          # U+039B
+        'μ': r'$\mu$',              # U+03BC
+        'ν': r'$\nu$',              # U+03BD
+        'ξ': r'$\xi$',              # U+03BE
+        'Ξ': r'$\Xi$',              # U+039E
+        'π': r'$\pi$',              # U+03C0
+        'Π': r'$\Pi$',              # U+03A0
+        'ρ': r'$\rho$',             # U+03C1
+        'σ': r'$\sigma$',           # U+03C3
+        'Σ': r'$\Sigma$',           # U+03A3
+        'τ': r'$\tau$',             # U+03C4
+        'υ': r'$\upsilon$',         # U+03C5
+        'Υ': r'$\Upsilon$',         # U+03A5
+        'φ': r'$\varphi$',          # U+03C6
+        'Φ': r'$\Phi$',             # U+03A6
+        'χ': r'$\chi$',             # U+03C7
+        'ψ': r'$\psi$',             # U+03C8
+        'Ψ': r'$\Psi$',             # U+03A8
+        'ω': r'$\omega$',           # U+03C9
+        'Ω': r'$\Omega$',           # U+03A9
+    }
+    
+    # Apply conversions
+    for unicode_char, latex_cmd in unicode_to_latex.items():
+        if unicode_char in content:
+            content = content.replace(unicode_char, latex_cmd)
+    
+    # Additional aggressive Unicode space cleanup using regex
+    # Handle various Unicode spaces more comprehensively
+    content = re.sub(r'[\u2000-\u200F\u2028-\u202F\u205F\u3000]', ' ', content)  # All Unicode spaces
+    
+    # Handle specific problematic Unicode characters that might not be in our dictionary
+    content = re.sub(r'[\u2010-\u2015]', '-', content)  # Various Unicode dashes
+    content = re.sub(r'[\u2212]', '-', content)         # Unicode minus sign
+    
+    # Handle specific cases where characters might appear in math environments
+    # Fix double math mode (e.g., $\alpha$ inside already math mode)
+    content = re.sub(r'\$\$([^$]+)\$\$', r'$\1$', content)  # Convert display math to inline
+    content = re.sub(r'\$\$([^$]*)\$([^$]*)\$\$', r'$\1\2$', content)  # Fix broken math
+    
+    # Fix bar notation that might have been broken
+    content = re.sub(r'\$\\bar\{\}\$([a-zA-Z])', r'$\\bar{\1}$', content)
+    content = re.sub(r'([a-zA-Z])\$\\bar\{\}\$', r'$\\bar{\1}$', content)
+    
+    return content
+
+def _additional_unicode_cleanup(content: str) -> str:
+    """
+    Additional aggressive Unicode cleanup to handle any characters that slip through.
+    """
+    # Convert all common problematic Unicode spaces to regular spaces
+    # This covers a wider range than the dictionary approach
+    unicode_spaces = [
+        '\u00A0',  # Non-breaking space
+        '\u1680',  # Ogham space mark
+        '\u2000',  # En quad
+        '\u2001',  # Em quad
+        '\u2002',  # En space
+        '\u2003',  # Em space
+        '\u2004',  # Three-per-em space
+        '\u2005',  # Four-per-em space
+        '\u2006',  # Six-per-em space
+        '\u2007',  # Figure space
+        '\u2008',  # Punctuation space
+        '\u2009',  # Thin space
+        '\u200A',  # Hair space
+        '\u200B',  # Zero width space
+        '\u202F',  # Narrow no-break space
+        '\u205F',  # Medium mathematical space
+        '\u3000',  # Ideographic space
+    ]
+    
+    for unicode_space in unicode_spaces:
+        content = content.replace(unicode_space, ' ')
+    
+    # Convert Unicode dashes
+    unicode_dashes = [
+        '\u2010',  # Hyphen
+        '\u2011',  # Non-breaking hyphen
+        '\u2012',  # Figure dash
+        '\u2013',  # En dash
+        '\u2014',  # Em dash
+        '\u2015',  # Horizontal bar
+        '\u2212',  # Minus sign
+    ]
+    
+    for unicode_dash in unicode_dashes:
+        if unicode_dash in ['\u2013', '\u2014']:  # En and Em dashes
+            content = content.replace(unicode_dash, '--')
+        else:
+            content = content.replace(unicode_dash, '-')
+    
+    # Use regex for any remaining problematic characters
+    # Remove or replace any remaining Unicode characters that commonly cause issues
+    content = re.sub(r'[\u2000-\u200F\u2028-\u202F\u205F\u3000]', ' ', content)
+    content = re.sub(r'[\u2010-\u2015\u2212]', '-', content)
+    
+    return content
+
+def _fix_mixed_mathematical_expressions(content: str) -> str:
+    """
+    Removes duplicated plain-text versions of mathematical expressions
+    that Pandoc sometimes generates alongside the LaTeX version by deleting
+    the plain text part when it is immediately followed by the LaTeX part.
+    """
+    
+    processed_content = content
+
+    # A list of compiled regex patterns.
+    # Each pattern matches a plain-text formula but only if it's followed
+    # by its corresponding LaTeX version (using a positive lookahead).
+    patterns_to_remove = [
+        # Pattern for: hq,k=x[nq,k]...h_{q,k} = x[n_{q,k}]...
+        re.compile(r'h[qrs],k=x\[n[qrs],k\](?:,h[qrs],k=x\[n[qrs],k\])*\s*' +
+                   r'(?=h_{q,k}\s*=\s*x\\\[n_{q,k}\\\],)', re.UNICODE),
+
+        # Pattern for: ∆hq,r,k=hq,k-hr,k...\Delta h_{q,r,k} = ...
+        re.compile(r'(?:∆h[qrs],[qrs],k=h[qrs],k-h[qrs],k\s*)+' +
+                   r'(?=\\Delta\s*h_{q,r,k})', re.UNICODE),
+
+        # Pattern for: RRk=tr,k+1-tr,kRR_k = ...
+        re.compile(r'RRk=tr,k\+1-tr,k\s*' +
+                   r'(?=RR_k\s*=\s*t_{r,k\+1})', re.UNICODE),
+
+        # Pattern for: Tmed=median{RRk}T_{\mathrm{med}}
+        re.compile(r'Tmed=median\{RRk\}\s*' +
+                   r'(?=T_{\\mathrm{med}}\s*=\s*\\mathrm{median}\\{RR_k\\})', re.UNICODE),
+
+        # Pattern for: Tk=[tr,k-Tmed2, tr,k+Tmed2]\mathcal{T}_k
+        re.compile(r'Tk=\[tr,k-Tmed2,.*?tr,k\+Tmed2\]\s*' +
+                   r'(?=\\mathcal\{T\}_k\s*=\s*\\\[t_{r,k})', re.UNICODE | re.DOTALL),
+
+        # Pattern for: h¯k=1|Ik|∑n∈Ikx[n]\bar h_k
+        re.compile(r'h¯k=1\|Ik\|∑n∈Ikx\[n\]\s*' +
+                   r'(?=\\bar\s*h_k\s*=\s*\\frac)', re.UNICODE),
+
+        # Pattern for: Mrs=median{∆hr,s,k}M_{rs}
+        re.compile(r'Mrs=median\{∆hr,s,k\}\s*' +
+                   r'(?=M_{rs}\s*=\s*\\mathrm{median})', re.UNICODE),
+        
+        # Pattern for: ∆h¯k=h¯k-Mrs\Delta\bar h_k
+        re.compile(r'∆h¯k=h¯k-Mrs\s*' +
+                   r'(?=\\Delta\\bar\s*h_k\s*=\s*\\bar\s*h_k)', re.UNICODE),
+    ]
+
+    for pattern in patterns_to_remove:
+        processed_content = pattern.sub('', processed_content)
+    
+    return processed_content
 
 def _fix_compilation_issues(content: str) -> str:
     """
