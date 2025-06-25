@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader } from 'lucide-react';
+import { Upload, FileText, Download, Settings, HelpCircle, Zap, Check, Loader, Globe, Monitor } from 'lucide-react';
 
 interface ConversionOptions {
   generateToc: boolean;
@@ -19,6 +19,9 @@ export default function Home() {
   const [showHelp, setShowHelp] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [usingLocalApi, setUsingLocalApi] = useState(false);
+  const [manualApiSwitch, setManualApiSwitch] = useState(false);
 
   const [options, setOptions] = useState<ConversionOptions>({
     generateToc: false,
@@ -50,61 +53,118 @@ export default function Home() {
     event.preventDefault();
   };
 
+  const getApiBaseUrl = () => {
+    if (manualApiSwitch) {
+      return usingLocalApi ? 'http://localhost:5000' : 'https://shayan5422-docx-to-latex.hf.space';
+    }
+    return usingLocalApi ? 'http://localhost:5000' : 'https://shayan5422-docx-to-latex.hf.space';
+  };
+
+  const toggleApiSource = () => {
+    setUsingLocalApi(!usingLocalApi);
+    setManualApiSwitch(true);
+    setApiError(null);
+    setConversionComplete(false);
+    setTaskId(null);
+  };
+
   const handleConvert = async () => {
     if (!selectedFile) return;
     
     setIsConverting(true);
+    setApiError(null);
     
     try {
+      const apiBaseUrl = getApiBaseUrl();
+      
       // First, upload the file
       const formData = new FormData();
       formData.append('file', selectedFile);
       
-      const uploadResponse = await fetch('http://localhost:5000/api/upload', {
+      const uploadResponse = await fetch(`${apiBaseUrl}/api/upload`, {
         method: 'POST',
         body: formData,
       });
       
-      if (!uploadResponse.ok) {
-        throw new Error('File upload failed');
-      }
+              if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('Upload failed:', uploadResponse.status, errorText);
+          
+          // If Hugging Face fails and we haven't manually switched or tried local yet
+          if (!usingLocalApi && !manualApiSwitch && uploadResponse.status >= 500) {
+            setUsingLocalApi(true);
+            setApiError(`Hugging Face API error (${uploadResponse.status}). Switching to local API...`);
+            
+            // Retry with local API
+            try {
+              const localFormData = new FormData();
+              localFormData.append('file', selectedFile);
+              
+              const localUploadResponse = await fetch('http://localhost:5000/api/upload', {
+                method: 'POST',
+                body: localFormData,
+              });
+              
+              if (!localUploadResponse.ok) {
+                const localErrorText = await localUploadResponse.text();
+                throw new Error(`Local API also failed: ${localUploadResponse.status} - ${localErrorText}`);
+              }
+              
+              const localUploadData = await localUploadResponse.json();
+              const localTaskId = localUploadData.task_id;
+              
+              // Continue with local API conversion
+              await performConversion(localTaskId, 'http://localhost:5000');
+              return;
+            } catch (localError) {
+              throw new Error(`Both APIs failed. Hugging Face: ${uploadResponse.status} ${errorText.substring(0, 100)}. Local: ${localError instanceof Error ? localError.message : 'Connection refused'}`);
+            }
+          }
+          
+          throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText.substring(0, 200)}`);
+        }
       
       const uploadData = await uploadResponse.json();
       const taskId = uploadData.task_id;
       
       // Then, start the conversion
-      const convertResponse = await fetch('http://localhost:5000/api/convert', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          task_id: taskId,
-          output_filename: outputFileName,
-          options: {
-            generateToc: options.generateToc,
-            overleafCompatible: options.overleafCompatible,
-            preserveStyles: options.preserveStyles,
-            preserveLineBreaks: options.preserveLineBreaks,
-            extractMedia: true,
-          },
-        }),
-      });
-      
-      if (!convertResponse.ok) {
-        throw new Error('Conversion failed');
-      }
-      
-      // Store task ID for download
-      setTaskId(taskId);
-      setIsConverting(false);
-      setConversionComplete(true);
+      await performConversion(taskId, apiBaseUrl);
       
     } catch (error) {
       console.error('Conversion error:', error);
       setIsConverting(false);
-      // You might want to show an error state here
+      setApiError(error instanceof Error ? error.message : 'Conversion failed');
     }
+  };
+
+  const performConversion = async (taskId: string, apiBaseUrl: string) => {
+    const convertResponse = await fetch(`${apiBaseUrl}/api/convert`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        task_id: taskId,
+        output_filename: outputFileName,
+        options: {
+          generateToc: options.generateToc,
+          overleafCompatible: options.overleafCompatible,
+          preserveStyles: options.preserveStyles,
+          preserveLineBreaks: options.preserveLineBreaks,
+          extractMedia: true,
+        },
+      }),
+    });
+    
+    if (!convertResponse.ok) {
+      throw new Error(`Conversion failed: ${convertResponse.status} ${convertResponse.statusText}`);
+    }
+    
+    // Store task ID for download
+    setTaskId(taskId);
+    setIsConverting(false);
+    setConversionComplete(true);
+    setApiError(null);
   };
 
   const toggleOption = (key: keyof ConversionOptions) => {
@@ -131,9 +191,37 @@ export default function Home() {
           <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
             DOCX to LaTeX Converter
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-6">
             Transform your Word documents into beautiful LaTeX files with enhanced formatting and Overleaf compatibility
           </p>
+          
+          {/* API Source Selector */}
+          <div className="flex items-center justify-center gap-4">
+            <span className="text-sm text-gray-600 dark:text-gray-400">API Source:</span>
+            <button
+              onClick={toggleApiSource}
+              className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                usingLocalApi
+                  ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300 border border-orange-300'
+                  : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300 border border-green-300'
+              } hover:scale-105 transform`}
+            >
+              {usingLocalApi ? (
+                <>
+                  <Monitor className="w-4 h-4 mr-2" />
+                  Local API
+                </>
+              ) : (
+                <>
+                  <Globe className="w-4 h-4 mr-2" />
+                  Hugging Face Spaces
+                </>
+              )}
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Click to switch
+            </span>
+          </div>
         </div>
 
         <div className="max-w-4xl mx-auto">
@@ -326,6 +414,35 @@ export default function Home() {
                 <p className="text-center text-gray-600 dark:text-gray-400 mt-2">
                   Processing your document...
                 </p>
+                {apiError && (
+                  <p className="text-center text-yellow-600 dark:text-yellow-400 mt-2 text-sm">
+                    {apiError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Error Display */}
+            {apiError && !isConverting && (
+              <div className="mt-8 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 animate-in slide-in-from-bottom-5 duration-500">
+                <div className="flex items-center">
+                  <div className="bg-red-100 dark:bg-red-800 p-2 rounded-full mr-3">
+                    <span className="text-red-600 dark:text-red-300 text-sm">⚠️</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-700 dark:text-red-300">
+                      Conversion Failed
+                    </h3>
+                    <p className="text-red-600 dark:text-red-400 text-sm">
+                      {apiError}
+                    </p>
+                    {usingLocalApi && (
+                      <p className="text-red-600 dark:text-red-400 text-xs mt-1">
+                        Currently using local API. Make sure your local backend is running on port 5000.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -351,7 +468,7 @@ export default function Home() {
                   <div className="flex flex-col sm:flex-row gap-3">
                     {/* LaTeX File Only */}
                     <button 
-                      onClick={() => taskId && window.open(`http://localhost:5000/api/download/${taskId}`, '_blank')}
+                      onClick={() => taskId && window.open(`${getApiBaseUrl()}/api/download/${taskId}`, '_blank')}
                       className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 transform"
                     >
                       <FileText className="w-5 h-5 mr-2" />
@@ -360,7 +477,7 @@ export default function Home() {
                     
                     {/* Complete Package */}
                     <button 
-                      onClick={() => taskId && window.open(`http://localhost:5000/api/download-complete/${taskId}`, '_blank')}
+                      onClick={() => taskId && window.open(`${getApiBaseUrl()}/api/download-complete/${taskId}`, '_blank')}
                       className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:scale-105 transform"
                     >
                       <Download className="w-5 h-5 mr-2" />
@@ -441,6 +558,18 @@ export default function Home() {
 
         {/* Footer */}
         <div className="text-center mt-12">
+          <div className="mb-4 flex items-center justify-center">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+              usingLocalApi 
+                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300'
+                : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+            }`}>
+              <span className={`w-2 h-2 rounded-full mr-2 ${
+                usingLocalApi ? 'bg-orange-500' : 'bg-green-500'
+              }`}></span>
+              {usingLocalApi ? 'Local API' : 'Hugging Face Spaces API'}
+            </span>
+          </div>
           <p className="text-gray-500 dark:text-gray-400">
             Enhanced DOCX to LaTeX Converter v2.0 | Built with Next.js &amp; Tailwind CSS
           </p>

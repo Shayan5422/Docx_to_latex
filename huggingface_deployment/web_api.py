@@ -6,18 +6,33 @@ import uuid
 from werkzeug.utils import secure_filename
 from converter import convert_docx_to_latex
 import shutil
+import stat
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # Configuration
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-UPLOAD_FOLDER = 'temp/uploads'
-OUTPUT_FOLDER = 'temp/outputs'
 
-# Ensure directories exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+# Use system temp directory for better compatibility with Hugging Face Spaces
+TEMP_BASE_DIR = tempfile.mkdtemp(prefix='docx_converter_')
+UPLOAD_FOLDER = os.path.join(TEMP_BASE_DIR, 'uploads')
+OUTPUT_FOLDER = os.path.join(TEMP_BASE_DIR, 'outputs')
+
+# Ensure directories exist with proper permissions
+def create_temp_dirs():
+    """Create temporary directories with proper permissions"""
+    for directory in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
+        os.makedirs(directory, exist_ok=True)
+        # Set full permissions for the directory
+        try:
+            os.chmod(directory, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+        except OSError:
+            # If chmod fails, continue anyway (some systems don't allow it)
+            pass
+
+# Create directories on startup
+create_temp_dirs()
 
 # Store conversion tasks
 conversion_tasks = {}
@@ -25,7 +40,13 @@ conversion_tasks = {}
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({'status': 'healthy', 'message': 'DOCX to LaTeX API is running'})
+    return jsonify({
+        'status': 'healthy', 
+        'message': 'DOCX to LaTeX API is running',
+        'temp_dir': TEMP_BASE_DIR,
+        'upload_dir': UPLOAD_FOLDER,
+        'output_dir': OUTPUT_FOLDER
+    })
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -44,26 +65,51 @@ def upload_file():
         # Generate unique task ID
         task_id = str(uuid.uuid4())
         
-        # Save uploaded file
+        # Save uploaded file using tempfile for better compatibility
         filename = secure_filename(file.filename)
-        file_path = os.path.join(UPLOAD_FOLDER, f"{task_id}_{filename}")
-        file.save(file_path)
         
-        # Store task info
-        conversion_tasks[task_id] = {
-            'status': 'uploaded',
-            'original_filename': filename,
-            'file_path': file_path,
-            'output_filename': filename.replace('.docx', '.tex'),
-            'created_at': os.path.getctime(file_path)
-        }
+        # Create a temporary file instead of using a fixed path
+        temp_fd, temp_path = tempfile.mkstemp(
+            suffix=f'_{filename}', 
+            prefix=f'{task_id}_',
+            dir=UPLOAD_FOLDER
+        )
         
-        return jsonify({
-            'task_id': task_id,
-            'filename': filename,
-            'status': 'uploaded',
-            'message': 'File uploaded successfully'
-        })
+        try:
+            # Close the file descriptor and save the file
+            os.close(temp_fd)
+            file.save(temp_path)
+            
+            # Set proper permissions on the file
+            try:
+                os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
+            except OSError:
+                # If chmod fails, continue anyway
+                pass
+            
+            # Store task info
+            conversion_tasks[task_id] = {
+                'status': 'uploaded',
+                'original_filename': filename,
+                'file_path': temp_path,
+                'output_filename': filename.replace('.docx', '.tex'),
+                'created_at': os.path.getctime(temp_path)
+            }
+            
+            return jsonify({
+                'task_id': task_id,
+                'filename': filename,
+                'status': 'uploaded',
+                'message': 'File uploaded successfully'
+            })
+            
+        except Exception as e:
+            # Clean up the temp file if something goes wrong
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+            raise e
         
     except Exception as e:
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
@@ -95,9 +141,18 @@ def convert_document():
         task['status'] = 'converting'
         task['output_filename'] = output_filename
         
-        # Prepare output paths
-        output_path = os.path.join(OUTPUT_FOLDER, f"{task_id}_{output_filename}")
-        media_path = os.path.join(OUTPUT_FOLDER, f"{task_id}_media")
+        # Prepare output paths using tempfile for better compatibility
+        output_fd, output_path = tempfile.mkstemp(
+            suffix=f'_{output_filename}',
+            prefix=f'{task_id}_',
+            dir=OUTPUT_FOLDER
+        )
+        os.close(output_fd)  # Close file descriptor, we'll write to the path directly
+        
+        media_path = tempfile.mkdtemp(
+            prefix=f'{task_id}_media_',
+            dir=OUTPUT_FOLDER
+        )
         
         # Perform conversion
         success, message = convert_docx_to_latex(
@@ -425,12 +480,26 @@ def cleanup_old_files():
     except Exception as e:
         print(f"Warning: Failed to cleanup old files: {e}")
 
+# Add cleanup on application exit
+import atexit
+
+def cleanup_on_exit():
+    """Clean up temporary directory on exit"""
+    try:
+        shutil.rmtree(TEMP_BASE_DIR)
+        print(f"Cleaned up temporary directory: {TEMP_BASE_DIR}")
+    except OSError:
+        pass
+
+atexit.register(cleanup_on_exit)
+
 if __name__ == '__main__':
     # Cleanup old files on startup
     cleanup_old_files()
     
     # Run the Flask app
     print("Starting DOCX to LaTeX API server...")
+    print(f"Using temporary directory: {TEMP_BASE_DIR}")
     print("API endpoints:")
     print("  POST /api/upload - Upload DOCX file")
     print("  POST /api/convert - Convert to LaTeX")
